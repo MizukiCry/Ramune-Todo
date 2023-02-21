@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "Ramune-Todo",
-    "version": "0.0.0"
+    "version": "1.0.0"
   },
   "tauri": {
     "allowlist": {
@@ -33,7 +33,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
+      "identifier": "mizuki.fun",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -60,10 +60,12 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
         "resizable": true,
         "title": "Ramune-Todo",
-        "width": 800
+        "height": 720,
+        "width": 1280,
+        "minHeight": 600,
+        "minWidth": 1000
       }
     ]
   }

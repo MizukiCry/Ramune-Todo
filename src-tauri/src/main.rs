@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -37,6 +37,9 @@ lazy_static! {
 
 fn update_file() {
     let mut data_file = DATA_FILE.lock().unwrap();
+    data_file.set_len(0).unwrap();
+    data_file.seek(SeekFrom::Start(0)).unwrap();
+
     let data_source = (
         *TASK_ID.lock().unwrap(),
         (*TASK_LIST.lock().unwrap()).clone(),
@@ -47,29 +50,36 @@ fn update_file() {
 
 #[tauri::command]
 fn add_task(detail: String, year: i32, month: i32, day: i32, tag: String) {
-    let mut task_id = TASK_ID.lock().unwrap();
-    let mut task_list = TASK_LIST.lock().unwrap();
-    *task_id += 1;
-    task_list.push(Task {
-        id: *task_id,
-        detail,
-        year,
-        month,
-        day,
-        tag,
-    });
+    {
+        let mut task_id = TASK_ID.lock().unwrap();
+        let mut task_list = TASK_LIST.lock().unwrap();
+        *task_id += 1;
+        task_list.push(Task {
+            id: *task_id,
+            detail,
+            year,
+            month,
+            day,
+            tag,
+        });
+    }
     update_file();
 }
 
 #[tauri::command]
 fn delete_task(id: i32) {
-    let mut task_list = TASK_LIST.lock().unwrap();
-    *task_list = task_list
-        .iter()
-        .filter(|task| id != task.id)
-        .map(|task| task.clone())
-        .collect::<Vec<_>>();
+    // println!("delete_task {}", id);
+    {
+        let mut task_list = TASK_LIST.lock().unwrap();
+        *task_list = task_list
+            .iter()
+            .filter(|task| id != task.id)
+            .map(|task| task.clone())
+            .collect::<Vec<_>>();
+    }
+    // println!("deleted");
     update_file();
+    // println!("updated");
 }
 
 fn task_cmp(a: &Task, b: &Task) -> Ordering {
@@ -124,6 +134,10 @@ fn get_tasks_by_time(
     end_month: i32,
     end_day: i32,
 ) -> Vec<Task> {
+    // println!(
+    //     "get_tasks_by_time {} {} {} {} {} {}",
+    //     begin_year, begin_month, begin_day, end_year, end_month, end_day
+    // );
     let begin_task = Task {
         id: 0,
         detail: String::new(),
@@ -156,16 +170,25 @@ fn get_tasks_by_time(
 }
 
 #[tauri::command]
-fn get_tasks_by_days(begin_year: i32, begin_month: i32, begin_day: i32, days: i32) -> Vec<Task> {
-    let begin_date =
-        NaiveDate::from_ymd_opt(begin_year as i32, begin_month as u32, begin_day as u32).unwrap();
-    let end_date = begin_date
-        .checked_add_days(Days::new(days as u64 - 1))
+fn get_tasks_by_days(
+    year: i32,
+    month: i32,
+    day: i32,
+    begin_offset: i32,
+    end_offset: i32,
+) -> Vec<Task> {
+    // println!("get_tasks_by_days {} {} {} {} {}", year, month, day, begin_offset, end_offset);
+    let original_date = NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32).unwrap();
+    let begin_date = original_date
+        .checked_add_days(Days::new(begin_offset as u64))
+        .unwrap();
+    let end_date = original_date
+        .checked_add_days(Days::new(end_offset as u64))
         .unwrap();
     get_tasks_by_time(
-        begin_year,
-        begin_month,
-        begin_day,
+        begin_date.year(),
+        begin_date.month() as i32,
+        begin_date.day() as i32,
         end_date.year(),
         end_date.month() as i32,
         end_date.day() as i32,
